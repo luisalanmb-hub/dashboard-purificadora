@@ -2,10 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const { open } = require('sqlite');
 const sqlite3 = require('sqlite3');
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Servir el archivo index.html para que abra al entrar a la página web
+app.use(express.static(path.join(__dirname)));
 
 let db;
 
@@ -55,12 +59,11 @@ app.post('/api/ventas', async (req, res) => {
   }
 });
 
-// Reportes avanzados: Analítica enfocada ÚNICAMENTE en Garrafones Grandes
+// Reportes avanzados
 app.get('/api/reportes-avanzados', async (req, res) => {
   try {
     const historial = await db.all('SELECT * FROM ventas_diarias ORDER BY fecha DESC');
 
-    // Totales y promedios solo para Garrafón Grande
     const generales = await db.get(`
       SELECT 
         SUM(garrafon_grande) as total_grandes,
@@ -69,7 +72,6 @@ app.get('/api/reportes-avanzados', async (req, res) => {
       FROM ventas_diarias
     `);
 
-    // Promedio por Día de la Semana SOLO para Garrafón Grande
     const porDiaSemana = await db.all(`
       SELECT 
         strftime('%w', fecha) as dia_num,
@@ -89,7 +91,6 @@ app.get('/api/reportes-avanzados', async (req, res) => {
       ORDER BY promedio_ventas DESC
     `);
 
-    // Proyección a 7 días basada en Garrafón Grande
     const promedioDiarioGrande = generales.promedio_diario_grande || 0;
     const proyeccion7Dias = Math.round(promedioDiarioGrande * 7);
 
@@ -109,8 +110,8 @@ app.get('/api/reportes-avanzados', async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log("--------------------------------------------------");
-  console.log("Servidor Activo en http://localhost:3000");
-  console.log("--------------------------------------------------");
+// Ajuste clave para la nube: usa el puerto asignado por Render o el 3000 si está local
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Servidor Activo en el puerto ${PORT}`);
 });
