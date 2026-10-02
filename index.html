@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <title>Control de Ventas - Purificadora</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Librería para leer archivos de Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -52,6 +54,13 @@
     }
 
     button:hover { background-color: #0277bd; }
+
+    .btn-excel {
+      background-color: #2e7d32;
+      margin-top: 10px;
+    }
+
+    .btn-excel:hover { background-color: #1b5e20; }
 
     .metrics-grid {
       display: grid;
@@ -125,6 +134,15 @@
       </div>
       <button type="submit" style="width: 100%; margin-top: 10px;">GUARDAR / ACTUALIZAR</button>
     </form>
+
+    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #e0e0e0;">
+
+    <!-- Carga Masiva desde Excel -->
+    <div class="form-group">
+      <label>Carga Masiva desde Excel (.xlsx):</label>
+      <input type="file" id="archivoExcel" accept=".xlsx, .xls">
+      <button type="button" onclick="cargarExcel()" class="btn-excel" style="width: 100%;">SUBIR DATOS DESDE EXCEL</button>
+    </div>
   </div>
 
   <!-- Indicadores Principales (Solo Garrafones Grandes) -->
@@ -215,6 +233,58 @@
         alert('Error al conectar con el servidor.');
       }
     });
+
+    async function cargarExcel() {
+      const input = document.getElementById('archivoExcel');
+      if (!input.files.length) {
+        alert('Por favor selecciona un archivo de Excel primero.');
+        return;
+      }
+
+      const file = input.files[0];
+      const reader = new FileReader();
+
+      reader.onload = async (e) => {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Convertir hoja a objeto JSON
+        const registros = XLSX.utils.sheet_to_json(worksheet);
+
+        let exitosos = 0;
+        for (const fila of registros) {
+          // Soporta encabezados comunes en español o inglés
+          const fecha = fila.Fecha || fila.fecha;
+          const garrafonGrande = fila['G. Grande'] || fila.garrafonGrande || fila.GarrafonGrande || 0;
+          const garrafonChico = fila['G. Chico'] || fila.garrafonChico || fila.GarrafonChico || 0;
+
+          if (fecha) {
+            try {
+              const res = await fetch('/api/ventas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  fecha: String(fecha).trim(),
+                  garrafonGrande: parseInt(garrafonGrande) || 0,
+                  garrafonChico: parseInt(garrafonChico) || 0
+                })
+              });
+              if (res.ok) exitosos++;
+            } catch (err) {
+              console.error('Error enviando fila:', err);
+            }
+          }
+        }
+
+        alert(`Proceso terminado. Se procesaron ${exitosos} registros correctamente.`);
+        input.value = '';
+        cargarDashboard();
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
 
     async function cargarDashboard() {
       try {
