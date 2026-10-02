@@ -95,10 +95,17 @@
       .charts-grid { grid-template-columns: 1fr; }
     }
 
+    /* Estilo del contenedor con barra de desplazamiento interna */
+    .table-container {
+      max-height: 350px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 10px;
     }
 
     th, td {
@@ -107,7 +114,13 @@
       border-bottom: 1px solid #e0e0e0;
     }
 
-    th { background-color: #f0f4f8; color: #0288d1; }
+    th {
+      background-color: #f0f4f8;
+      color: #0288d1;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
   </style>
 </head>
 <body>
@@ -183,20 +196,22 @@
     </div>
   </div>
 
-  <!-- Historial en Tabla -->
+  <!-- Historial en Tabla con Scroll Interno -->
   <div class="card">
     <h2>Historial Completo de Registros</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Fecha</th>
-          <th>G. Grande</th>
-          <th>G. Chico</th>
-          <th>Total Día</th>
-        </tr>
-      </thead>
-      <tbody id="tablaHistorial"></tbody>
-    </table>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>G. Grande</th>
+            <th>G. Chico</th>
+            <th>Total Día</th>
+          </tr>
+        </thead>
+        <tbody id="tablaHistorial"></tbody>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -234,11 +249,9 @@
       }
     });
 
-    // Convierte fechas numéricas de Excel o texto a formato AAAA-MM-DD
     function normalizarFecha(valor) {
       if (!valor) return null;
 
-      // Si es un número ordinal de Excel (ej: 45200)
       if (typeof valor === 'number') {
         const dateObj = XLSX.SSF.parse_date_code(valor);
         if (dateObj) {
@@ -251,7 +264,6 @@
 
       let str = String(valor).trim();
 
-      // Formato DD/MM/AAAA o DD-MM-AAAA
       if (str.includes('/') || (str.includes('-') && str.split('-')[0].length === 2)) {
         const separador = str.includes('/') ? '/' : '-';
         const partes = str.split(separador);
@@ -263,7 +275,6 @@
         }
       }
 
-      // Si ya es AAAA-MM-DD
       if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
         return str;
       }
