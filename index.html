@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>Control de Ventas - Purificadora</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="[https://cdn.jsdelivr.net/npm/chart.js](https://cdn.jsdelivr.net/npm/chart.js)"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #f4f6f9; /* Fondo blanco/gris claro profesional */
+      background-color: #f4f6f9;
       color: #333333;
       padding: 20px;
       max-width: 900px;
@@ -17,7 +17,7 @@
     h1, h2 { color: #0288d1; text-align: center; }
 
     .card {
-      background-color: #ffffff; /* Tarjetas blancas */
+      background-color: #ffffff;
       padding: 20px;
       border-radius: 8px;
       margin-bottom: 20px;
@@ -159,13 +159,13 @@
         <canvas id="graficoDias"></canvas>
       </div>
       <div>
-        <h3 style="text-align:center;">Tendencia de Histórico</h3>
-        <canvas id="graficoHistorico"></canvas>
+        <h3 style="text-align:center;">Ventas Totales por Mes (Mayor a Menor)</h3>
+        <canvas id="graficoMeses"></canvas>
       </div>
     </div>
   </div>
 
-  <!-- Historial en Tabla (Mantiene la columna de chicos solo para registro) -->
+  <!-- Historial en Tabla -->
   <div class="card">
     <h2>Historial Completo de Registros</h2>
     <table>
@@ -186,7 +186,7 @@
     const form = document.getElementById('formVentas');
 
     let chartDias = null;
-    let chartHistorico = null;
+    let chartMeses = null;
 
     cargarDashboard();
 
@@ -207,9 +207,12 @@
 
         if (respuesta.ok) {
           cargarDashboard();
+          alert('¡Venta guardada con éxito!');
+        } else {
+          alert('Error al guardar datos en el servidor.');
         }
       } catch (error) {
-        alert('Error al guardar datos');
+        alert('Error al conectar con el servidor.');
       }
     });
 
@@ -218,23 +221,23 @@
         const res = await fetch('/api/reportes-avanzados');
         const data = await res.json();
 
-        // 1. Métricas Principales (Garrafón Grande)
+        // 1. Métricas Principales
         document.getElementById('totalGeneral').textContent = data.generales.total_grandes || 0;
         document.getElementById('promedioDiario').textContent = data.proyeccion.promedioDiario || 0;
         document.getElementById('estimadoSemanal').textContent = data.proyeccion.estimadoSemanal || 0;
 
-        if (data.mejoresDias.length > 0) {
+        if (data.mejoresDias && data.mejoresDias.length > 0) {
           document.getElementById('mejorDia').textContent = data.mejoresDias[0].nombre_dia;
         }
 
         // 2. Gráficos
-        renderizarGraficoDias(data.mejoresDias);
-        renderizarGraficoHistorico(data.historial);
+        renderizarGraficoDias(data.mejoresDias || []);
+        renderizarGraficoMeses(data.historial || []);
 
         // 3. Tabla Historial
         const tablaHistorial = document.getElementById('tablaHistorial');
         tablaHistorial.innerHTML = '';
-        data.historial.forEach(row => {
+        (data.historial || []).forEach(row => {
           const tr = document.createElement('tr');
           const totalDia = row.garrafon_grande + row.garrafon_chico;
           tr.innerHTML = `
@@ -276,31 +279,60 @@
       });
     }
 
-    function renderizarGraficoHistorico(historial) {
-      const registros = [...historial].reverse();
-      const fechas = registros.map(r => r.fecha);
-      const grandes = registros.map(r => r.garrafon_grande);
+    function renderizarGraficoMeses(historial) {
+      const nombresMeses = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+      ];
 
-      if (chartHistorico) chartHistorico.destroy();
+      // Agrupar ventas totales de garrafones grandes por mes
+      const ventasPorMes = {};
 
-      const ctx = document.getElementById('graficoHistorico').getContext('2d');
-      chartHistorico = new Chart(ctx, {
-        type: 'line',
+      historial.forEach(registro => {
+        if (!registro.fecha) return;
+        const partes = registro.fecha.split('-'); // Formato AAAA-MM-DD
+        const año = partes[0];
+        const mesIndex = parseInt(partes[1], 10) - 1;
+        const claveMes = `${nombresMeses[mesIndex]} ${año}`;
+
+        if (!ventasPorMes[claveMes]) {
+          ventasPorMes[claveMes] = 0;
+        }
+        ventasPorMes[claveMes] += registro.garrafon_grande;
+      });
+
+      // Convertir a arreglo y ordenar de mayor a menor total
+      const listaMeses = Object.keys(ventasPorMes).map(mes => ({
+        mes: mes,
+        total: ventasPorMes[mes]
+      })).sort((a, b) => b.total - a.total);
+
+      const labels = listaMeses.map(item => item.mes);
+      const valores = listaMeses.map(item => item.total);
+
+      if (chartMeses) chartMeses.destroy();
+
+      const ctx = document.getElementById('graficoMeses').getContext('2d');
+      chartMeses = new Chart(ctx, {
+        type: 'bar',
         data: {
-          labels: fechas,
-          datasets: [
-            {
-              label: 'Garrafón Grande',
-              data: grandes,
-              borderColor: '#0288d1',
-              backgroundColor: 'rgba(2, 136, 209, 0.1)',
-              fill: true,
-              tension: 0.2
-            }
-          ]
+          labels: labels,
+          datasets: [{
+            label: 'Total G. Grandes',
+            data: valores,
+            backgroundColor: '#009688'
+          }]
         },
         options: {
           responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (context) => ` Total: ${context.parsed.y} garrafones`
+              }
+            }
+          },
           scales: { y: { beginAtZero: true } }
         }
       });
