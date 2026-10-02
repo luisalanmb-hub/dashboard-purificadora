@@ -116,21 +116,26 @@ app.get('/api/reportes-avanzados', async (req, res) => {
       ORDER BY promedio_ventas DESC
     `);
 
-    // Consulta de ventas por mes ordenadas de mayor a menor total
-    const porMes = await db.all(`
-      SELECT 
-        strftime('%Y-%m', fecha) as mes_clave,
-        CASE strftime('%m', fecha)
-          WHEN '01' THEN 'Enero'
-          WHEN '02' THEN 'Febrero'
-          WHEN '03' THEN 'Marzo'
-          WHEN '04' THEN 'Abril'
-          WHEN '05' THEN 'Mayo'
-          WHEN '06' THEN 'Junio'
-          WHEN '07' THEN 'Julio'
-          WHEN '08' THEN 'Agosto'
-          WHEN '09' THEN 'Septiembre'
-          WHEN '10Aquí tienes el código actualizado para **`index.html`** con los cambios que solicitaste:
+    const promedioDiarioGrande = generales.promedio_diario_grande || 0;
+    const proyeccion7Dias = Math.round(promedioDiarioGrande * 7);
 
-1. **Nueva gráfica mensual:** Muestra las ventas totales de garrafones grandes agrupadas por mes, ordenadas automáticamente desde el mes con **mayor cantidad de ventas** hasta el de **menor cantidad**, indicando la cifra exacta en cada barra.
-2. **Reemplazo de la gráfica de tendencia histórica:** Se eliminó por completo el gráfico de línea anterior y se sustituyó su espacio por esta nueva gráfica mensual.
+    res.json({
+      historial,
+      generales,
+      mejoresDias: porDiaSemana,
+      proyeccion: {
+        estimadoSemanal: proyeccion7Dias,
+        promedioDiario: Math.round(promedioDiarioGrande)
+      }
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al generar reportes avanzados" });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Servidor Activo en el puerto ${PORT}`);
+});
