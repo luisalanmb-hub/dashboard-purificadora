@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Control de Ventas - Purificadora</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f9; /* Fondo blanco/gris claro profesional */
+      color: #333333;
+      padding: 20px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1, h2 { color: #0288d1; text-align: center; }
+
+    .card {
+      background-color: #ffffff; /* Tarjetas blancas */
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border: 1px solid #e0e0e0;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-bottom: 15px;
+    }
+
+    label { font-weight: bold; }
+
+    input, button {
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      background-color: #ffffff;
+      color: #333;
+      font-size: 15px;
+    }
+
+    button {
+      background-color: #0288d1;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+      border: none;
+    }
+
+    button:hover { background-color: #0277bd; }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
+    }
+
+    .metric-box {
+      background-color: #e1f5fe;
+      padding: 15px;
+      border-radius: 6px;
+      text-align: center;
+      border: 1px solid #b3e5fc;
+    }
+
+    .metric-number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #0288d1;
+      margin-top: 5px;
+    }
+
+    .highlight { color: #d81b60; }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .charts-grid { grid-template-columns: 1fr; }
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th, td {
+      padding: 10px;
+      text-align: center;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    th { background-color: #f0f4f8; color: #0288d1; }
+  </style>
+</head>
+<body>
+
+  <h1>Purificadora de Agua - Dashboard Analítico</h1>
+
+  <!-- Formulario -->
+  <div class="card">
+    <h2>Capturar Ventas del Día</h2>
+    <form id="formVentas">
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+        <div class="form-group">
+          <label>Fecha:</label>
+          <input type="date" id="fecha" required>
+        </div>
+        <div class="form-group">
+          <label>G. Grande (Análisis):</label>
+          <input type="number" id="garrafonGrande" min="0" value="0" required>
+        </div>
+        <div class="form-group">
+          <label>G. Chico (Solo Registro):</label>
+          <input type="number" id="garrafonChico" min="0" value="0" required>
+        </div>
+      </div>
+      <button type="submit" style="width: 100%; margin-top: 10px;">GUARDAR / ACTUALIZAR</button>
+    </form>
+  </div>
+
+  <!-- Indicadores Principales (Solo Garrafones Grandes) -->
+  <div class="card">
+    <h2>Análisis de Garrafones Grandes</h2>
+    <div class="metrics-grid">
+      <div class="metric-box">
+        <div>Total G. Grandes</div>
+        <div id="totalGeneral" class="metric-number">0</div>
+      </div>
+      <div class="metric-box">
+        <div>Promedio Diario</div>
+        <div id="promedioDiario" class="metric-number">0</div>
+      </div>
+      <div class="metric-box">
+        <div>Día de Mayor Venta</div>
+        <div id="mejorDia" class="metric-number highlight">-</div>
+      </div>
+      <div class="metric-box">
+        <div>Estimado Próx. 7 Días</div>
+        <div id="estimadoSemanal" class="metric-number">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección de Gráficos -->
+  <div class="card">
+    <h2>Gráficos de Garrafones Grandes</h2>
+    <div class="charts-grid">
+      <div>
+        <h3 style="text-align:center;">Promedio por Día de la Semana</h3>
+        <canvas id="graficoDias"></canvas>
+      </div>
+      <div>
+        <h3 style="text-align:center;">Tendencia de Histórico</h3>
+        <canvas id="graficoHistorico"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial en Tabla (Mantiene la columna de chicos solo para registro) -->
+  <div class="card">
+    <h2>Historial Completo de Registros</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>G. Grande</th>
+          <th>G. Chico</th>
+          <th>Total Día</th>
+        </tr>
+      </thead>
+      <tbody id="tablaHistorial"></tbody>
+    </table>
+  </div>
+
+  <script>
+    document.getElementById('fecha').valueAsDate = new Date();
+    const form = document.getElementById('formVentas');
+
+    let chartDias = null;
+    let chartHistorico = null;
+
+    cargarDashboard();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const datos = {
+        fecha: document.getElementById('fecha').value,
+        garrafonGrande: parseInt(document.getElementById('garrafonGrande').value),
+        garrafonChico: parseInt(document.getElementById('garrafonChico').value)
+      };
+
+      try {
+        const respuesta = await fetch('http://localhost:3000/api/ventas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(datos)
+        });
+
+        if (respuesta.ok) {
+          cargarDashboard();
+        }
+      } catch (error) {
+        alert('Error al guardar datos');
+      }
+    });
+
+    async function cargarDashboard() {
+      try {
+        const res = await fetch('http://localhost:3000/api/reportes-avanzados');
+        const data = await res.json();
+
+        // 1. Métricas Principales (Garrafón Grande)
+        document.getElementById('totalGeneral').textContent = data.generales.total_grandes || 0;
+        document.getElementById('promedioDiario').textContent = data.proyeccion.promedioDiario || 0;
+        document.getElementById('estimadoSemanal').textContent = data.proyeccion.estimadoSemanal || 0;
+
+        if (data.mejoresDias.length > 0) {
+          document.getElementById('mejorDia').textContent = data.mejoresDias[0].nombre_dia;
+        }
+
+        // 2. Gráficos
+        renderizarGraficoDias(data.mejoresDias);
+        renderizarGraficoHistorico(data.historial);
+
+        // 3. Tabla Historial
+        const tablaHistorial = document.getElementById('tablaHistorial');
+        tablaHistorial.innerHTML = '';
+        data.historial.forEach(row => {
+          const tr = document.createElement('tr');
+          const totalDia = row.garrafon_grande + row.garrafon_chico;
+          tr.innerHTML = `
+            <td>${row.fecha}</td>
+            <td><strong>${row.garrafon_grande}</strong></td>
+            <td>${row.garrafon_chico}</td>
+            <td>${totalDia}</td>
+          `;
+          tablaHistorial.appendChild(tr);
+        });
+
+      } catch (error) {
+        console.error("Error cargando dashboard:", error);
+      }
+    }
+
+    function renderizarGraficoDias(mejoresDias) {
+      const labels = mejoresDias.map(d => d.nombre_dia);
+      const valores = mejoresDias.map(d => Math.round(d.promedio_ventas));
+
+      if (chartDias) chartDias.destroy();
+
+      const ctx = document.getElementById('graficoDias').getContext('2d');
+      chartDias = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Promedio G. Grande',
+            data: valores,
+            backgroundColor: '#0288d1'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    function renderizarGraficoHistorico(historial) {
+      const registros = [...historial].reverse();
+      const fechas = registros.map(r => r.fecha);
+      const grandes = registros.map(r => r.garrafon_grande);
+
+      if (chartHistorico) chartHistorico.destroy();
+
+      const ctx = document.getElementById('graficoHistorico').getContext('2d');
+      chartHistorico = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: fechas,
+          datasets: [
+            {
+              label: 'Garrafón Grande',
+              data: grandes,
+              borderColor: '#0288d1',
+              backgroundColor: 'rgba(2, 136, 209, 0.1)',
+              fill: true,
+              tension: 0.2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+  </script>
+
+</body>
+</html>
