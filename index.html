@@ -199,7 +199,7 @@
       };
 
       try {
-        const respuesta = await fetch('http://localhost:3000/api/ventas', {
+        const respuesta = await fetch('/api/ventas', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(datos)
@@ -215,7 +215,7 @@
 
     async function cargarDashboard() {
       try {
-        const res = await fetch('http://localhost:3000/api/reportes-avanzados');
+        const res = await fetch('/api/reportes-avanzados');
         const data = await res.json();
 
         // 1. Métricas Principales (Garrafón Grande)
