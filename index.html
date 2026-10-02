@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Control de Ventas - Purificadora</title>
-  <script src="[https://cdn.jsdelivr.net/npm/chart.js](https://cdn.jsdelivr.net/npm/chart.js)"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -285,12 +285,11 @@
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
       ];
 
-      // Agrupar ventas totales de garrafones grandes por mes
       const ventasPorMes = {};
 
       historial.forEach(registro => {
         if (!registro.fecha) return;
-        const partes = registro.fecha.split('-'); // Formato AAAA-MM-DD
+        const partes = registro.fecha.split('-');
         const año = partes[0];
         const mesIndex = parseInt(partes[1], 10) - 1;
         const claveMes = `${nombresMeses[mesIndex]} ${año}`;
@@ -301,7 +300,6 @@
         ventasPorMes[claveMes] += registro.garrafon_grande;
       });
 
-      // Convertir a arreglo y ordenar de mayor a menor total
       const listaMeses = Object.keys(ventasPorMes).map(mes => ({
         mes: mes,
         total: ventasPorMes[mes]
