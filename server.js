@@ -8,7 +8,32 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Servir el archivo index.html para que abra al entrar a la página web
+// CONFIGURACIÓN DE ACCESO
+const USUARIO_VALIDO = 'lioma';
+const PASSWORD_VALIDO = 'perrixkya';
+
+// Middleware de autenticación Basic Auth
+app.use((req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Acceso Protegido - Purificadora"');
+    return res.status(401).send('Acceso denegado: Se requiere autenticación.');
+  }
+
+  const auth = Buffer.from(authHeader.split(' ')[1], 'base64').toString().split(':');
+  const usuario = auth[0];
+  const password = auth[1];
+
+  if (usuario === USUARIO_VALIDO && password === PASSWORD_VALIDO) {
+    next();
+  } else {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Acceso Protegido - Purificadora"');
+    return res.status(401).send('Credenciales incorrectas.');
+  }
+});
+
+// Servir archivos estáticos tras validar usuario
 app.use(express.static(path.join(__dirname)));
 
 let db;
@@ -59,7 +84,7 @@ app.post('/api/ventas', async (req, res) => {
   }
 });
 
-// Reportes avanzados
+// Reportes avanzados (Garrafones Grandes)
 app.get('/api/reportes-avanzados', async (req, res) => {
   try {
     const historial = await db.all('SELECT * FROM ventas_diarias ORDER BY fecha DESC');
@@ -110,7 +135,6 @@ app.get('/api/reportes-avanzados', async (req, res) => {
   }
 });
 
-// Ajuste clave para la nube: usa el puerto asignado por Render o el 3000 si está local
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor Activo en el puerto ${PORT}`);
