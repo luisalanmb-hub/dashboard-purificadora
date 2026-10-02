@@ -234,6 +234,43 @@
       }
     });
 
+    // Convierte fechas numéricas de Excel o texto a formato AAAA-MM-DD
+    function normalizarFecha(valor) {
+      if (!valor) return null;
+
+      // Si es un número ordinal de Excel (ej: 45200)
+      if (typeof valor === 'number') {
+        const dateObj = XLSX.SSF.parse_date_code(valor);
+        if (dateObj) {
+          const y = dateObj.y;
+          const m = String(dateObj.m).padStart(2, '0');
+          const d = String(dateObj.d).padStart(2, '0');
+          return `${y}-${m}-${d}`;
+        }
+      }
+
+      let str = String(valor).trim();
+
+      // Formato DD/MM/AAAA o DD-MM-AAAA
+      if (str.includes('/') || (str.includes('-') && str.split('-')[0].length === 2)) {
+        const separador = str.includes('/') ? '/' : '-';
+        const partes = str.split(separador);
+        if (partes.length === 3) {
+          const d = partes[0].padStart(2, '0');
+          const m = partes[1].padStart(2, '0');
+          const y = partes[2].length === 2 ? `20${partes[2]}` : partes[2];
+          return `${y}-${m}-${d}`;
+        }
+      }
+
+      // Si ya es AAAA-MM-DD
+      if (str.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return str;
+      }
+
+      return null;
+    }
+
     async function cargarExcel() {
       const input = document.getElementById('archivoExcel');
       if (!input.files.length) {
@@ -246,33 +283,21 @@
 
       reader.onload = async (e) => {
         const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         
-        // Convertir hoja a objeto JSON
-        const registros = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+        const registros = XLSX.utils.sheet_to_json(worksheet, { raw: true });
 
         let exitosos = 0;
         for (const fila of registros) {
-          let fechaRaw = fila.Fecha || fila.fecha;
+          const fechaRaw = fila.Fecha || fila.fecha;
           const garrafonGrande = fila['G. Grande'] || fila.garrafonGrande || fila.GarrafonGrande || 0;
           const garrafonChico = fila['G. Chico'] || fila.garrafonChico || fila.GarrafonChico || 0;
 
-          if (fechaRaw) {
-            let fechaFormateada = String(fechaRaw).trim();
+          const fechaFormateada = normalizarFecha(fechaRaw);
 
-            // Si la fecha viene en formato DD/MM/AAAA la convertimos a AAAA-MM-DD
-            if (fechaFormateada.includes('/')) {
-              const partes = fechaFormateada.split('/');
-              if (partes.length === 3) {
-                const dia = partes[0].padStart(2, '0');
-                const mes = partes[1].padStart(2, '0');
-                const año = partes[2];
-                fechaFormateada = `${año}-${mes}-${dia}`;
-              }
-            }
-
+          if (fechaFormateada) {
             try {
               const res = await fetch('/api/ventas', {
                 method: 'POST',
@@ -310,6 +335,8 @@
 
         if (data.mejoresDias && data.mejoresDias.length > 0) {
           document.getElementById('mejorDia').textContent = data.mejoresDias[0].nombre_dia;
+        } else {
+          document.getElementById('mejorDia').textContent = '-';
         }
 
         // 2. Gráficos
@@ -372,8 +399,12 @@
       historial.forEach(registro => {
         if (!registro.fecha) return;
         const partes = registro.fecha.split('-');
+        if (partes.length < 2) return;
+        
         const año = partes[0];
         const mesIndex = parseInt(partes[1], 10) - 1;
+        if (isNaN(mesIndex) || mesIndex < 0 || mesIndex > 11) return;
+
         const claveMes = `${nombresMeses[mesIndex]} ${año}`;
 
         if (!ventasPorMes[claveMes]) {
