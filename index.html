@@ -246,27 +246,39 @@
 
       reader.onload = async (e) => {
         const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         
         // Convertir hoja a objeto JSON
-        const registros = XLSX.utils.sheet_to_json(worksheet);
+        const registros = XLSX.utils.sheet_to_json(worksheet, { raw: false });
 
         let exitosos = 0;
         for (const fila of registros) {
-          // Soporta encabezados comunes en español o inglés
-          const fecha = fila.Fecha || fila.fecha;
+          let fechaRaw = fila.Fecha || fila.fecha;
           const garrafonGrande = fila['G. Grande'] || fila.garrafonGrande || fila.GarrafonGrande || 0;
           const garrafonChico = fila['G. Chico'] || fila.garrafonChico || fila.GarrafonChico || 0;
 
-          if (fecha) {
+          if (fechaRaw) {
+            let fechaFormateada = String(fechaRaw).trim();
+
+            // Si la fecha viene en formato DD/MM/AAAA la convertimos a AAAA-MM-DD
+            if (fechaFormateada.includes('/')) {
+              const partes = fechaFormateada.split('/');
+              if (partes.length === 3) {
+                const dia = partes[0].padStart(2, '0');
+                const mes = partes[1].padStart(2, '0');
+                const año = partes[2];
+                fechaFormateada = `${año}-${mes}-${dia}`;
+              }
+            }
+
             try {
               const res = await fetch('/api/ventas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  fecha: String(fecha).trim(),
+                  fecha: fechaFormateada,
                   garrafonGrande: parseInt(garrafonGrande) || 0,
                   garrafonChico: parseInt(garrafonChico) || 0
                 })
